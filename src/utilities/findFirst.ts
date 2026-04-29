@@ -4,15 +4,17 @@ import { GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb'
 
 import type { DynamoAdapter } from '../types.js'
 
-import { matchesWhere } from './matchesWhere.js'
+import { buildFilterExpression } from './buildFilterExpression.js'
 import { whereToId } from './whereToId.js'
 
 /**
- * Locate the first item matching `where` in the given collection. Used by
- * `findOne` directly and by `deleteOne` to capture the doc before deletion.
+ * Locate the first item matching `where` in the given table. Used by
+ * `findOne` directly and by `deleteOne`/`updateOne` to capture the doc
+ * before mutating.
  *
  * Fast path: if `where` is a pure id-equality, do a single `GetItem`.
- * Slow path: paginate `Scan` and filter in JS.
+ * Slow path: paginate `Scan` with `FilterExpression` pushdown and stop on
+ * the first matching row in any page.
  */
 export async function findFirst(
   adapter: DynamoAdapter,
@@ -36,18 +38,25 @@ export async function findFirst(
     return result.Item ?? null
   }
 
+  const filter = buildFilterExpression(args.where)
   let exclusiveStartKey: Record<string, unknown> | undefined
+
   while (true) {
     const result = await docClient.send(
       new ScanCommand({
         TableName: tableName,
+        ...(filter
+          ? {
+              ExpressionAttributeNames: filter.names,
+              ExpressionAttributeValues: filter.values,
+              FilterExpression: filter.expression,
+            }
+          : {}),
         ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
       }),
     )
     for (const item of result.Items ?? []) {
-      if (matchesWhere(item, args.where)) {
-        return item
-      }
+      return item
     }
     if (!result.LastEvaluatedKey) {
       return null

@@ -1,14 +1,7 @@
 import type { Where } from 'payload'
 
 import { getByPath } from './getByPath.js'
-
-const SUPPORTED_OPERATORS = new Set([
-  'equals',
-  'not_equals',
-  'exists',
-  'in',
-  'not_in',
-])
+import { SUPPORTED_OPERATORS, unsupportedOperatorError } from './operators.js'
 
 /**
  * In-memory predicate that evaluates a Payload `Where` against a fetched item.
@@ -55,10 +48,7 @@ export function matchesWhere(item: Record<string, unknown>, where: Where | undef
 
     for (const [operator, expected] of Object.entries(operators)) {
       if (!SUPPORTED_OPERATORS.has(operator)) {
-        throw new Error(
-          `payload-ddb: operator \`${operator}\` is not supported yet on field \`${key}\`. ` +
-            `Supported: ${[...SUPPORTED_OPERATORS].join(', ')}, and, or.`,
-        )
+        throw unsupportedOperatorError(operator, key)
       }
 
       if (!evaluate(fieldValue, operator, expected)) {

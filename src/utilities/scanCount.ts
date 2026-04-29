@@ -7,36 +7,29 @@ import type { DynamoAdapter } from '../types.js'
 import { buildFilterExpression } from './buildFilterExpression.js'
 
 /**
- * Walk a table via paginated `Scan`, pushing the `where` filter to DynamoDB
- * via `FilterExpression` so we don't transfer non-matching rows over the
- * wire. Returns every matching item materialized in memory — suitable for
- * callers that need the full set (sort, paginate, bulk-mutate).
- *
- * Use `findFirst` instead when you only need the first match: that helper
- * stops scanning on the first hit.
- *
- * Cost note: `FilterExpression` reduces network bytes but not RCU
- * consumption. DynamoDB still reads every row before filtering. The next
- * meaningful optimization is GSI / Query routing for indexed access patterns.
+ * Paginated count over a table, with optional `FilterExpression` pushdown.
+ * Always uses `Select: 'COUNT'` so DynamoDB skips item bytes — only the
+ * post-filter `Count` per page comes back over the wire.
  */
-export async function scanMatching(
+export async function scanCount(
   adapter: DynamoAdapter,
   tableName: string,
   where: undefined | Where,
-): Promise<Record<string, unknown>[]> {
+): Promise<number> {
   const docClient = adapter.docClient
   if (!docClient) {
     throw new Error('payload-ddb: docClient is not initialized — call connect() first.')
   }
 
   const filter = buildFilterExpression(where)
-  const matched: Record<string, unknown>[] = []
+  let totalDocs = 0
   let exclusiveStartKey: Record<string, unknown> | undefined
 
   while (true) {
     const result = await docClient.send(
       new ScanCommand({
         TableName: tableName,
+        Select: 'COUNT',
         ...(filter
           ? {
               ExpressionAttributeNames: filter.names,
@@ -47,12 +40,12 @@ export async function scanMatching(
         ...(exclusiveStartKey ? { ExclusiveStartKey: exclusiveStartKey } : {}),
       }),
     )
-    for (const item of result.Items ?? []) {
-      matched.push(item)
-    }
+
+    totalDocs += result.Count ?? 0
+
     if (!result.LastEvaluatedKey) break
     exclusiveStartKey = result.LastEvaluatedKey
   }
 
-  return matched
+  return totalDocs
 }

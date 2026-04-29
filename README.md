@@ -96,12 +96,12 @@ the four global version methods, and `queryDrafts`.
 
 ## Known limits / future work
 
-- **`Scan`-based queries.** No `FilterExpression` translation yet — the entire
-  collection table is read on every `find`/`count`/`findVersions`. Filtering
-  happens in JS. This is correct but expensive for large tables.
-- **No GSI / Query routing.** Every read is a `Scan`. Adding GSIs that mirror
+- **No GSI / Query routing.** Every non-id read is a `Scan` (with
+  `FilterExpression` pushdown — DynamoDB still reads every row internally,
+  but only matching rows come back over the wire). Adding GSIs that mirror
   Payload's common access patterns (e.g. `email` for auth, `slug` for
-  public-facing collections) is the highest-impact optimization milestone.
+  public-facing collections) is the highest-impact remaining optimization
+  milestone and is planned for v2.
 - **Limited `where` operator coverage.** `equals`, `not_equals`, `exists`,
   `in`, `not_in`, `and`, `or`. Anything else throws — by design, so coverage
   gaps surface loudly. Range and `like`/`contains` operators land alongside
