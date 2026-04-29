@@ -1,0 +1,48 @@
+import type { FindVersions, PaginatedDocs } from 'payload'
+
+import type { DynamoAdapter } from './types.js'
+
+import { applySorts } from './utilities/applySorts.js'
+import { scanMatching } from './utilities/scanMatching.js'
+
+/**
+ * Same shape as `find` but routed at the versions table. Could share more
+ * code with `find` via a `paginatedScan(adapter, tableName, args)` helper,
+ * but keeping them separate makes per-method tweaks (e.g. version-only
+ * filters, eventual draft-aware logic) easier to land without refactoring.
+ */
+export const findVersions: FindVersions = async function findVersions(
+  this: DynamoAdapter,
+  { collection, limit = 10, page = 1, pagination = true, sort, where },
+) {
+  const tableName = this.resolveVersionsTableName(collection)
+  const matched = await scanMatching(this, tableName, where)
+  applySorts(matched, sort)
+
+  const totalDocs = matched.length
+  const useLimit = pagination && limit > 0
+  const effectiveLimit = useLimit ? limit : totalDocs
+  const totalPages = useLimit ? Math.max(1, Math.ceil(totalDocs / limit)) : 1
+  const safePage = useLimit ? Math.max(1, page) : 1
+
+  const start = useLimit ? (safePage - 1) * limit : 0
+  const end = useLimit ? start + limit : totalDocs
+  const docs = matched.slice(start, end)
+
+  const hasNextPage = useLimit && safePage < totalPages
+  const hasPrevPage = useLimit && safePage > 1
+
+  const result: PaginatedDocs<Record<string, unknown>> = {
+    docs,
+    hasNextPage,
+    hasPrevPage,
+    limit: effectiveLimit,
+    nextPage: hasNextPage ? safePage + 1 : null,
+    page: safePage,
+    pagingCounter: useLimit ? (safePage - 1) * limit + 1 : 1,
+    prevPage: hasPrevPage ? safePage - 1 : null,
+    totalDocs,
+    totalPages,
+  }
+  return result as never
+}

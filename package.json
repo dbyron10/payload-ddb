@@ -1,0 +1,54 @@
+{
+  "name": "@dilton/payload-ddb",
+  "version": "1.0.0",
+  "description": "An unofficial database provider for PayloadCMS, utilizing DynamoDb",
+  "keywords": [
+    "payloadcms",
+    "ddb",
+    "dynamo",
+    "dynamodb",
+    "database",
+    "provider"
+  ],
+  "homepage": "https://github.com/dbyron10/payload-ddb#readme",
+  "bugs": {
+    "url": "https://github.com/dbyron10/payload-ddb/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dbyron10/payload-ddb.git"
+  },
+  "license": "MIT",
+  "author": "Dillon Byron",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "swc src -d dist --strip-leading-paths",
+    "prepublishOnly": "pnpm run build",
+    "test": "exit 0"
+  },
+  "peerDependencies": {
+    "payload": ">=3.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1038.0",
+    "@aws-sdk/lib-dynamodb": "^3.1038.0"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.8.1",
+    "@swc/core": "^1.15.32",
+    "@types/node": "^25.6.0",
+    "payload": "^3.84.1",
+    "typescript": "^6.0.3"
+  }
+}
